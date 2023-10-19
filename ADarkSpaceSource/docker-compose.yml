@@ -1,0 +1,36 @@
+version: '3.4'
+
+services:
+  adsfront:
+    image: ${DOCKER_REGISTRY-}adsfront
+    build:
+      context: .
+      dockerfile: ADSFront/Dockerfile
+    environment:
+      DATASTORE_HOST: datastore
+    depends_on:
+      - datastore
+
+  adstestapp:
+    image: ${DOCKER_REGISTRY-}adstestapp
+    build:
+      context: .
+      dockerfile: ADSTestApp/Dockerfile
+    environment:
+      DATASTORE_HOST: datastore
+    depends_on:
+      - datastore
+
+  datastore:
+    image: mongo
+    restart: always
+    command: --quiet --syslog
+    expose:
+        - "27017"
+    volumes:
+        - datastore-data:/data/db
+        - mongo-config:/data/configdb
+
+volumes:
+  datastore-data:
+  mongo-config:
