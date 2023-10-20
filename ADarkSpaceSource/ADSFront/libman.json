@@ -4,7 +4,10 @@
   "libraries": [
     {
       "library": "pixi.js@7.3.1",
-      "destination": "wwwroot/lib/pixi.js/"
+      "destination": "wwwroot/lib/pixi.js/",
+      "files": [
+        "pixi.min.js"
+      ]
     }
   ]
 }

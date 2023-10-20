@@ -9,5 +9,8 @@
         public string PlayersCollectionName { get; set; } = null!;
 
         public string ShipsCollectionName { get; set; } = null!;
+
+        public string SectorsCollectionName { get; set; } = null!;
+
     }
 }
