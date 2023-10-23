@@ -76,6 +76,7 @@ export class Ship extends Entity {
         startForward: new Vector2(1, 0),
         endForward: new Vector2(1, 0),
         endPosition: new Vector2(0, 0),
+        turn: 0,
         speed: 1,
         startTime: -1,
         endTime: -1,
@@ -116,8 +117,11 @@ export class Ship extends Entity {
             // The pivot point
             this._gameobject.pivot.x = this._gameobject.width / 2;
             this._gameobject.pivot.y = this._gameobject.height / 2;
-            this._gameobject.x = this.position.x + this.sector.radius;
-            this._gameobject.y = this.position.y + this.sector.radius;
+
+            // The position of the gameobject subtracts the Y coord to invert the Y axis, since PIXI.js uses a Y axis that grows downwards
+            // but the game uses a Y axis that grows upwards
+            this._gameobject.x = this.sector.radius + this.position.x;
+            this._gameobject.y = this.sector.radius - this.position.y;
 
             // The forward-facing firing arc
             const firingArc = new PIXI.Graphics()
@@ -147,11 +151,12 @@ export class Ship extends Entity {
         }
         return this._gameobject;
     }
-    setNextMove(startPosition, startForward, speed, endPosition, endForward, startTime, endTime) {
+    setNextMove(startPosition, startForward, speed, endPosition, endForward, turn, startTime, endTime) {
         this.nextMove.startPosition = startPosition;
         this.nextMove.startForward = startForward;
         this.nextMove.endPosition = endPosition;
         this.nextMove.endForward = endForward;
+        this.nextMove.turn = turn;
         this.nextMove.speed = speed;
         this.nextMove.startTime = startTime;
         this.nextMove.endTime = endTime;
@@ -161,41 +166,48 @@ export class Ship extends Entity {
         if (!this.nextMove.isMoving) {
             return;
         }
-        const totalMovementTime = this.nextMove.endTime - this.nextMove.startTime;
+        // Times are provided by the server in milliseconds
+        const totalMovementTime = (this.nextMove.endTime - this.nextMove.startTime) / 1000;
         // Calculate the interpolation factor t
-        const t = Math.max(0, Math.min(1, elapsedTimeSinceMovementStart / totalMovementTime));
+        const t = Math.max(0, Math.min(1, elapsedTimeSinceMovementStart / 1000 / totalMovementTime));
 
         // Normalize the forward and targetForward vectors
         const normalizedStartForward = this.nextMove.startForward.normalize();
         const normalizedEndForward = this.nextMove.endForward.normalize();
 
         // Calculate the angle between the initial and final directions
-        const directionChange = Math.acos(normalizedStartForward.dot(normalizedEndForward)) * Math.sign(-normalizedStartForward.cross(normalizedEndForward));
+        const directionChange = this.nextMove.turn;
 
         let interpolatedState;
 
         // If there is no direction change, then the forward direction is constant, and the position is linear.
-        if (Math.abs(directionChange < 0.00001)) {
+        if (Math.abs(directionChange) < 0.00001) {
             interpolatedState = {
-                position: this.nextMove.startPosition.add(normalizedStartForward.scale(this.speed * t)),
+                position: this.nextMove.startPosition.add(normalizedStartForward.scale(this.nextMove.speed * totalMovementTime * t)),
                 forward: normalizedStartForward
             };
             return interpolatedState;
         } else {
             // If there is direction change, then the forward direction is interpolated, and the position is circular.
             // Calculate the interpolated position
+
+            // The key idea here is that to determine the final position after the turn we can just:
+            // 1. Determine the radius of the turn. The radius is the length of the arc (the speed times the total time) divided by the angle of the turn.
             const partialDirectionChange = directionChange * t;
-            const radius = this.speed / directionChange;
+            const radius = this.nextMove.speed * totalMovementTime / directionChange;
 
-            // Translate the vectorToMove a distance of radius, depending on whether we are turning right or left.
-            const originalVector = normalizedStartForward;
-            let translationVector = originalVector.perpendicularClockwise * radius;
-
-            const forwardRotatedAroundRadius = this.#translateRotateTranslate(originalVector, translationVector, partialDirectionChange);
+            // 2. Translate the point to move a distance of radius, depending on whether we are turning right or left.
+            // If we are turning right, the translation vector is the left perpendicular of the forward vector, scaled by the radius.
+            // If we are turning left, the translation vector is the right perpendicular of the forward vector, scaled by the radius.
+            // Because the radius calculation comes out negative when turning right, and positive when turning left, we can just use the right 
+            // perpendicular to the forward vector and multiply by the radius.
+            const originalPosition = new Vector2(0, 0);
+            let translationVector = normalizedStartForward.perpendicularClockwise.scale(radius);
+            const forwardRotatedAroundRadius = this.#translateRotateTranslate(originalPosition, translationVector, partialDirectionChange);
             const partialPosition = this.nextMove.startPosition.add(forwardRotatedAroundRadius);
 
             // Calculate the interpolated forward direction
-            const interpolatedForward = normalizedStartForward.rotate((directionChange) * t);
+            const interpolatedForward = normalizedStartForward.rotate(partialDirectionChange);
 
             // Create an object to store the interpolated state
             const interpolatedState = {

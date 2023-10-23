@@ -155,6 +155,7 @@ function hydrateShip(shipData, existingShip) {
         shipData.speed,
         new Vector2(shipData.endPositionX, shipData.endPositionY),
         new Vector2(shipData.endForwardX, shipData.endForwardY),
+        shipData.targetTurn,
         shipData.movementStartTime,
         shipData.movementEndTime);
     return ship;
@@ -231,7 +232,7 @@ async function start() {
 
 async function periodicallySynch() {
     await synchServerData();
-//    pollerHandle = setTimeout(periodicallySynch, 2000);
+    pollerHandle = setTimeout(periodicallySynch, 2000);
 }
 
 let elapsedTimeSinceLastUpdate = 0;
@@ -242,10 +243,6 @@ function frameUpdate() {
     if (now < 0) {
         return;
     }
-    redDot.x = ships[0].nextMove.startPosition.x;
-    redDot.y = ships[0].nextMove.startPosition.y;
-    greenDot.x = ships[0].nextMove.endPosition.x;
-    greenDot.y = ships[0].nextMove.endPosition.y;
 
     for (const ship of ships) {
         // Update the ship's position and rotation
@@ -254,10 +251,18 @@ function frameUpdate() {
         ship.forward = interpolatedState.forward;
 
         // Update the gameobject
-        ship.gameobject.rotation = ship.direction;
-        ship.gameobject.x = ship.position.x + ship.gameobject.parent.pivot.x;
-        ship.gameobject.y = ship.position.y + ship.gameobject.parent.pivot.y;
+        // The game entities use a coord system where the y axis grow upwards, while PIXI uses a coord system where the y axis grows downwards.
+        // Also, rotations are counterclockwise in the game, while they are clockwise in PIXI.
+        // So we need to do some conversions.
+        ship.gameobject.rotation = -ship.direction;
+        ship.gameobject.x = ship.gameobject.parent.pivot.x + ship.position.x;
+        ship.gameobject.y = ship.gameobject.parent.pivot.y - ship.position.y;
     }
+    redDot.x = ships[0].nextMove.startPosition.x;
+    redDot.y = -ships[0].nextMove.startPosition.y;
+    greenDot.x = ships[0].nextMove.endPosition.x;
+    greenDot.y = -ships[0].nextMove.endPosition.y;
+
 }
 
 

@@ -2,9 +2,7 @@ using ADSTestApp.Data;
 using ADSTestApp.Entities;
 using ADSTestApp.Services;
 using System.Numerics;
-using System.Runtime.Intrinsics;
 using System.Security.Cryptography;
-using System.Transactions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -69,6 +67,7 @@ app.MapGet("/GetGameState", async()=>
     }
     catch (Exception ex)
     {
+        Console.WriteLine(ex.Message);
         await storeService.DeleteAllShipsAsync();
     }
 
@@ -78,7 +77,7 @@ app.MapGet("/GetGameState", async()=>
         // If no ships in the sector, create some.
         if (ships.Count == 0)
         {
-            var shipCount = RandomNumberGenerator.GetInt32(3) + 2;
+            var shipCount = RandomNumberGenerator.GetInt32(5) + 2;
             ships = (from i in Enumerable.Range(0, shipCount)
                      let type = Ship.ShipTypes[RandomNumberGenerator.GetInt32(Ship.ShipTypes.Count)]
                      let startPosition = new Vector2(RandomNumberGenerator.GetInt32(1000) - 500, RandomNumberGenerator.GetInt32(1000) - 500)
@@ -88,7 +87,7 @@ app.MapGet("/GetGameState", async()=>
                      let startForward = new Vector2(MathF.Cos(startDirection), -MathF.Sin(startDirection))
                      let endForward = new Vector2(MathF.Cos(endDirection), -MathF.Sin(endDirection))
                      let speed = 100
-                     let endPosition = CalculateEndPosition(startPosition, startForward, endForward, speed, movementTime)
+                     let endPosition = CalculateEndPosition(startPosition, startForward, endForward, targetTurn, speed, movementTime)
                      select new Ship
                      {
                          Name = $"{type} #{i}",
@@ -126,14 +125,10 @@ app.MapGet("/GetGameState", async()=>
                 ship.StartForward = ship.EndForward;                
                 ship.TargetTurn = (RandomNumberGenerator.GetInt32(5) - 2) * (float)Math.PI / 4;
                 ship.EndForward = RotateVector2(ship.StartForward, ship.TargetTurn);                                
-                ship.EndPosition = CalculateEndPosition(ship.StartPosition, ship.StartForward, ship.EndForward, ship.Speed, movementTime);
+                ship.EndPosition = CalculateEndPosition(ship.StartPosition, ship.StartForward, ship.EndForward, ship.TargetTurn, ship.Speed, movementTime);
 
                 paralellizableAwaits.Add(storeService.UpdateShipAsync(ship.Id, ship));
             }
-            var s = ships[0];
-            var degrees = MathF.Abs(s.TargetTurn * 180 / (float)Math.PI);
-            var side = s.TargetTurn < 0 ? "left" : (s.TargetTurn > 0 ? "right" : "straight");
-            Console.WriteLine($"{s.Name} will go {side} {degrees} degrees.");
         }
         // Wait until all ships are created/updated and the sector is created (if needed).
         await Task.WhenAll(paralellizableAwaits);
@@ -153,21 +148,14 @@ app.MapGet("/GetGameState", async()=>
     return Results.Ok(result);
 });
 
-Vector2 CalculateEndPosition(Vector2 startPosition, Vector2 startForward, Vector2 endForward, float speed, int movementTime)
+Vector2 CalculateEndPosition(Vector2 startPosition, Vector2 startForward, Vector2 endForward, float turn, float speed, int movementTime)
 {
     // Normalize the forward and targetForward vectors
     var normalizedStartForward = Vector2.Normalize(startForward);
     var normalizedTargetForward = Vector2.Normalize(endForward);
 
-    // Calculate the angle between the initial and final directions
-    float Cross(Vector2 a, Vector2 b)
-    {
-        return a.X * b.Y - a.Y * b.X;
-    }
-    var directionChange = MathF.Acos(Vector2.Dot(normalizedStartForward, normalizedTargetForward)) * MathF.Sign(Cross(normalizedStartForward, normalizedTargetForward));
-
     // If there is no direction change, then the forward direction is constant, and the position is linear.
-    if (MathF.Abs(directionChange) < 0.00001)
+    if (MathF.Abs(turn) < 0.00001)
     {
         return startPosition + normalizedStartForward * speed * movementTime / 1000;
     }
@@ -175,14 +163,13 @@ Vector2 CalculateEndPosition(Vector2 startPosition, Vector2 startForward, Vector
     {
         // If there is direction change, then the forward direction is interpolated, and the position is circular.
         // Calculate the interpolated position
-        var radius = speed / directionChange;
+        var radius = speed * movementTime / 1000 / turn;
 
         // Translate the vectorToMove a distance of radius, depending on whether we are turning right or left.        
-        var translationVector = PerpendicularClockwise(normalizedStartForward);
-        translationVector *= radius;        
+        var translationVector = PerpendicularClockwise(normalizedStartForward) * radius;
 
-        var forwardRotatedAroundRadius = TranslateRotateTranslate(normalizedStartForward, translationVector, -directionChange);
-        var finalPosition = startPosition + forwardRotatedAroundRadius;
+        var originRotatedAroundRadius = TranslateRotateTranslate(Vector2.Zero, translationVector, turn);
+        var finalPosition = startPosition + originRotatedAroundRadius;
 
         return finalPosition;
     }
@@ -212,6 +199,5 @@ Vector2 TranslateRotateTranslate(Vector2 vector, Vector2 translation, float angl
     var finalVector = rotatedVector - translation;
     return finalVector;
 }
-
 
 app.Run();
