@@ -1,4 +1,5 @@
 ﻿import { Vector2 } from './Vector2.js';
+import { Sector, Entity, Ship } from './Entities.js';
 
 const name = "gameclient";
 
@@ -17,7 +18,7 @@ const shipTypes = [
     { name: "B-Wing", img: 'img/b-wing.png', imgdir: Math.PI, speed: 90 },
     { name: "TIE Fighter", img: 'img/t-f.png', imgdir: Math.PI, speed: 100 },
     { name: "TIE Interceptor", img: 'img/t-i.png', imgdir: Math.PI, speed: 115 },
-    { name: "TIE Bomber", img: 'img/t-b.png', imgdir: Math.PI, speed: 80 },
+    { name: "TIE Bomber", img: 'img/t-b.png', imgdir: Math.PI, speed: 180 },
     { name: "TIE Advanced", img: 'img/t-a.png', imgdir: Math.PI, speed: 120 },
     { name: "TIE Defender", img: 'img/t-d.png', imgdir: Math.PI, speed: 120 },
     { name: "Shuttle", img: 'img/shuttle.png', imgdir: Math.PI, speed: 60 },
@@ -31,9 +32,13 @@ for (const shipType of shipTypes) {
     shipTypesDict[shipType.name] = shipType;
 }
 
+let redDot;
+let greenDot;
+
 function createSector() {
     const sectorRadius = 2000;
     const container = new PIXI.Container();
+    container.sortableChildren = true;
     const graphics = new PIXI.Graphics()
         .lineStyle(5, 0xFFF8, 1)
         .beginFill(0x0008)
@@ -44,6 +49,24 @@ function createSector() {
     container.pivot.y = container.height / 2;
     container.x = app.screen.width / 2;
     container.y = app.screen.height / 2;
+
+    redDot = new PIXI.Graphics()
+        .lineStyle(1, 0xFF0000, 1)
+        .beginFill(0xAA0000)
+        .drawCircle(container.pivot.x, container.pivot.y, 5)
+        .endFill();
+    redDot.zIndex = 1000;
+    container.addChild(redDot);
+
+    greenDot = new PIXI.Graphics()
+        .lineStyle(1, 0x00FF00, 1)
+        .beginFill(0x00AA00)
+        .drawCircle(container.pivot.x, container.pivot.y, 5)
+        .endFill();
+    greenDot.zIndex = 1001;
+
+    container.addChild(greenDot);
+
     app.stage.addChild(container);
 
     container.eventMode = 'static';
@@ -80,12 +103,11 @@ function createSector() {
         container.position.y = originalPosition.y + currentPoint.y - dragStartPoint.y;
     }
 
-    const sector = {
-        gameobject: container,
-        radius: sectorRadius,        
-    };
+    const sector = new Sector(sectorRadius);
+    sector.gameobject = container;
     return sector;
 }
+
 
 /**
  * The ships that are currently in the game
@@ -95,40 +117,6 @@ const shipDict = {};
 let sector;
 
 let pollerHandle;
-function spawnShips() {
-    for (let i = 0; i < 200; i++) {
-        const pick = shipTypes[Math.floor(Math.random() * shipTypes.length)];
-        const ship = Object.assign({}, pick);
-        ships.push(ship);
-    }
-    for (const element of ships) {
-        let shipType = element;
-        shipType.direction = 0;
-        let sprite = PIXI.Sprite.from(shipType.img);
-        sprite.anchor.set(0.5);
-        sprite.rotation -= shipType.imgdir;
-        shipType.radius = Math.max(sprite.width, sprite.height) * 0.75;
-
-        const gameobject = new PIXI.Container();
-        shipType.gameobject = gameobject;
-        gameobject.addChild(sprite);
-        gameobject.pivot.x = gameobject.width / 2;
-        gameobject.pivot.y = gameobject.height / 2;
-
-        shipType.rotationSpeed = Math.random() * .2 - .1;
-
-        // Create the sprite and add it to the stage
-        shipType.direction = Math.random() * Math.PI * 2;
-        gameobject.x = (Math.random() + 1) * app.screen.width / 2;
-        gameobject.y = (Math.random() + 1) * app.screen.height / 2;
-
-        shipType.thinkPeriod = 1;
-        shipType.thinkElapsed = 0;
-        shipType.swervingRotationSpeed = 2 * Math.sign(Math.random() - 0.5);
-
-        app.stage.addChild(gameobject);
-    }
-}
 
 /**
  * Give JSON data for one ship got from the ShipUpdater worker container, and an existing ship object from the client, 
@@ -146,73 +134,69 @@ function hydrateShip(shipData, existingShip) {
         ship = existingShip;
         ship.name = shipData.name;
         ship.type = shipType;
-        ship.direction = shipData.rotation;
-        ship.speed = shipData.speed;
-        ship.rotationSpeed = shipData.rotationSpeed;
-        ship.position = new Vector2(shipData.positionX, shipData.positionY);
+        ship.oldPosition = ship.position;
+        ship.position = new Vector2(shipData.startPositionX, shipData.startPositionY);
+        ship.forward = new Vector2(shipData.startForwardX, shipData.startForwardY);                
     } else {
         // Otherwise, create a new local ship from the ship data and add it to the scene.
-        ship = {
-            id: shipData.id,
-            name: shipData.name,
-            type: shipType,
-            direction: shipData.rotation,
-            speed: shipData.speed,
-            rotationSpeed: shipData.rotationSpeed,
-            position: new Vector2(shipData.positionX, shipData.positionY),
-            get sprite() {
-                delete this.sprite;
-                this.sprite = PIXI.Sprite.from(shipType.img);
-                this.sprite.anchor.set(0.5);
-                this.sprite.rotation -= shipType.imgdir;
-                return this.sprite;
-            },
-            get radius() {
-                delete this.radius;
-                this.radius = Math.max(this.sprite.width, this.sprite.height) * 0.75;
-                return this.radius;
-            },
-            get gameobject() {
-                delete this.gameobject;
-                this.gameobject = new PIXI.Container();
-                this.gameobject.addChild(this.sprite);
-                this.gameobject.pivot.x = this.gameobject.width / 2;
-                this.gameobject.pivot.y = this.gameobject.height / 2;
-                this.gameobject.x = this.position.x + sector.radius;
-                this.gameobject.y = this.position.y + sector.radius;
-                return this.gameobject;
-            },            
-            thinkPeriod: 1,
-            thinkElapsed: 0,
-            swervingRotationSpeed: 2 * Math.sign(Math.random() - 0.5),
-        };
+        ship = new Ship(
+            shipType,
+            new Vector2(shipData.startPositionX, shipData.startPositionY),
+            new Vector2(shipData.startForwardX, shipData.startForwardY),
+            shipData.speed,
+            sector
+        );
+        ship.id = shipData.id;
+        ship.name = shipData.name;
+        ship.oldPosition = ship.position;
     }
+    ship.setNextMove(new Vector2(shipData.startPositionX, shipData.startPositionY),
+        new Vector2(shipData.startForwardX, shipData.startForwardY),
+        shipData.speed,
+        new Vector2(shipData.endPositionX, shipData.endPositionY),
+        new Vector2(shipData.endForwardX, shipData.endForwardY),
+        shipData.movementStartTime,
+        shipData.movementEndTime);
     return ship;
 }
 
 /**
  * Poll the worker to obtain up-to-date data about the ships in the game sector
  */
-async function synchShips() {
+async function synchServerData() {
     try {
         // Poll the worker
         const response = await fetch('/PollWorker', { cache: 'no-cache' });
+        // If it answers, process the response
         if (response.ok) {
             const jsonResponse = await response.json();
-            let idsFetched = {};
+            const idsFetched = {};
             const serverData = JSON.parse(jsonResponse);
-            const sectorData = serverData.sector;
+
+            // Update the sector data
+            const lastLocalUpdateTime = sector.lastUpdateTime;
+            sector.updateFromServerData(serverData.sector);
+            if (sector.lastUpdateTime <= lastLocalUpdateTime) {
+                console.log('Sector data is stale. Skipping update.');
+                return;
+            }            
+            // Update the ships
             serverData.ships
                 .forEach(shipData => {
+                    // Note down the ship id as fetched from the worker
                     idsFetched[shipData.id] = true;
+                    // Get the ship object from the local dictionary
                     const oldShip = shipDict[shipData.id];
+                    // Update the ship object with the data from the worker
                     const updatedShip = hydrateShip(shipData, oldShip);
+                    // If the ship was not in the local dictionary, add it to the scene
                     if (!oldShip) {
                         ships.push(updatedShip);
                         shipDict[shipData.id] = updatedShip;
                         sector.gameobject.addChild(updatedShip.gameobject);
                     }
                 });
+            // Remove ships that were not fetched from the worker. They must have been destroyed or something.
             ships.forEach(ship => {
                 if (!idsFetched[ship.id]) {
                     sector.gameobject.removeChild(ship.gameobject);
@@ -220,6 +204,7 @@ async function synchShips() {
                     delete shipDict[ship.id];
                 }
             });
+            elapsedTimeSinceLastUpdate = 0;
         }
     }
     catch (error) {
@@ -239,49 +224,39 @@ async function start() {
 
     sector = createSector();
 
-    await synchShips();
+    await periodicallySynch();
     // Add a ticker callback to move the sprites
-    app.ticker.add(frameUpdate);
-
-    pollerHandle = setInterval(async () => {
-        await synchShips();
-    }, 2000);
+    app.ticker.add(frameUpdate);    
 }
 
-function frameUpdate() {    
-    const dt = app.ticker.deltaMS * 0.001;
-    for (const ship of ships) {
+async function periodicallySynch() {
+    await synchServerData();
+//    pollerHandle = setTimeout(periodicallySynch, 2000);
+}
 
-        ship.direction += ship.rotationSpeed * dt;
-        ship.position.x += Math.cos(ship.direction) * ship.speed * dt;
-        ship.position.y += Math.sin(ship.direction) * ship.speed * dt;
-        ship.gameobject.transform.rotation = ship.direction;
+let elapsedTimeSinceLastUpdate = 0;
+function frameUpdate() {    
+    const dt = app.ticker.deltaMS;
+    elapsedTimeSinceLastUpdate += dt;
+    const now = Date.now();
+    if (now < 0) {
+        return;
+    }
+    redDot.x = ships[0].nextMove.startPosition.x;
+    redDot.y = ships[0].nextMove.startPosition.y;
+    greenDot.x = ships[0].nextMove.endPosition.x;
+    greenDot.y = ships[0].nextMove.endPosition.y;
+
+    for (const ship of ships) {
+        // Update the ship's position and rotation
+        const interpolatedState = ship.interpolateMovement(elapsedTimeSinceLastUpdate);
+        ship.position = interpolatedState.position;
+        ship.forward = interpolatedState.forward;
+
+        // Update the gameobject
+        ship.gameobject.rotation = ship.direction;
         ship.gameobject.x = ship.position.x + ship.gameobject.parent.pivot.x;
         ship.gameobject.y = ship.position.y + ship.gameobject.parent.pivot.y;
-
-        if (ship.gameobject.rotation < 0) {
-            ship.gameobject.rotation += 2 * Math.PI;
-        }
-        if (ship.gameobject.rotation >= 2 * Math.PI) {
-            ship.gameobject.rotation -= 2 * Math.PI;
-        }
-
-        if (ship.thinkElapsed >= ship.thinkPeriod) {
-            ship.thinkElapsed = 0;
-
-            const lookAhead = {
-                x: ship.position.x + Math.cos(ship.direction) * ship.speed * 3,
-                y: ship.position.y + Math.sin(ship.direction) * ship.speed * 3
-            };
-
-            if (Math.sqrt(lookAhead.x * lookAhead.x + lookAhead.y * lookAhead.y) > sector.radius) {
-                ship.rotationSpeed = ship.swervingRotationSpeed;
-            } else {
-                ship.rotationSpeed = Math.random() * 2 - 1;
-            }
-        } else {
-            ship.thinkElapsed += dt;
-        }
     }
 }
 
@@ -290,4 +265,4 @@ function end() {
     clearInterval(pollerHandle);
 }
 
-export { start, shipTypes, name };
+export { start, end, shipTypes, name };

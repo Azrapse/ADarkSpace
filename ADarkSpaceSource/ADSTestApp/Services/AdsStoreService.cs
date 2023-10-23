@@ -62,6 +62,9 @@ namespace ADSTestApp.Services
         public async Task DeleteAllPlayersAsync() =>
             await _playersCollection.DeleteManyAsync(x => true);
 
+        public async Task DeleteAllShipsAsync() =>
+            await _shipsCollection.DeleteManyAsync(x => true);
+
         public IQueryable<Player> Players =>_playersCollection.AsQueryable();
 
         public IQueryable<Ship> Ships  => _shipsCollection.AsQueryable();

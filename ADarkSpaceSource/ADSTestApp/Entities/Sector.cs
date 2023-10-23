@@ -22,5 +22,7 @@ namespace ADSTestApp.Entities
         [BsonElement("UpdatedBy")]
         public string UpdatedBy { get; set; } = "None";
 
+        [BsonElement("Time")]
+        public long Time { get; set; } = long.MinValue;
     }
 }

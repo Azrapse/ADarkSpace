@@ -23,19 +23,74 @@ namespace ADSTestApp.Entities
         public string ShipType { get; set; }    = "X-Wing";
 
 
-        [BsonElement("PositionX")]
-        public float PositionX { get; set; }    = 0f;
-        [BsonElement("PositionY")]
-        public float PositionY { get; set; }    = 0f;
+        [BsonElement("StartPositionX")]
+        public float StartPositionX { get; set; }    = 0f;
+        [BsonElement("StartPositionY")]
+        public float StartPositionY { get; set; }    = 0f;
+        [BsonIgnore]
+        public Vector2 StartPosition
+        {
+            get => new(StartPositionX, StartPositionY);
+            set 
+            {
+                StartPositionX = value.X;
+                StartPositionY = value.Y;
+            }
+        }
 
-        [BsonElement("Rotation")]
-        public float Rotation { get; set; }     = 0f;
+        [BsonElement("EndPositionX")]
+        public float EndPositionX { get; set; } = 0f;
+        [BsonElement("EndPositionY")]
+        public float EndPositionY { get; set; } = 0f;
+        [BsonIgnore]
+        public Vector2 EndPosition
+        {
+            get => new(EndPositionX, EndPositionY);
+            set
+            {
+                EndPositionX = value.X;
+                EndPositionY = value.Y;
+            }
+        }
+
+        [BsonElement("StartForwardX")]
+        public float StartForwardX { get; set; }     = 1f;
+        [BsonElement("StartForwardY")]
+        public float StartForwardY { get; set; } = 0f;
+        [BsonIgnore]
+        public Vector2 StartForward {
+            get => new(StartForwardX, StartForwardY); 
+            set
+            {
+                StartForwardX = value.X;
+                StartForwardY = value.Y;
+            }
+        }
+
+
+        [BsonElement("EndForwardX")]
+        public float EndForwardX { get; set; } = 1f;
+        [BsonElement("EndForwardY")]
+        public float EndForwardY { get; set; } = 0f;
+
+        [BsonIgnore]
+        public Vector2 EndForward {
+            get => new(EndForwardX, EndForwardY);
+            set
+            {
+                EndForwardX = value.X;
+                EndForwardY = value.Y;
+            }
+        }
 
         [BsonElement("Speed")]
         public float Speed { get; set; }        = 100f;
 
-        [BsonElement("RotationSpeed")]
-        public float RotationSpeed { get; set; } = 0f;
-
+        [BsonElement("TargetTurn")]
+        public float TargetTurn { get; set; } = 0f;
+        [BsonElement("MovementStartTime")]
+        public long MovementStartTime { get; set; } = -1;
+        [BsonElement("MovementEndTime")]
+        public long MovementEndTime { get; set; } = -1;
     }
 }

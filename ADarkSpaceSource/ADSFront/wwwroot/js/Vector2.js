@@ -2,7 +2,7 @@
  * A 2D vector class. 
  * Modified from source: https://gist.github.com/qazd/dadf59318ea49017a8b74ac7a0a49d99
  */
-class Vector2 {
+export default class Vector2 {
 	x = 0;
 	y = 0;
 
@@ -35,6 +35,10 @@ class Vector2 {
 		return (this.x * vector.x + this.y * vector.y);
 	}
 
+	cross(vector) {
+		return this.x * vector.y - this.y * vector.x;
+	}
+
 	moveTowards(vector, t) {
 		// Linearly interpolates between vectors A and B by t.
 		// t = 0 returns A, t = 1 returns B
@@ -44,7 +48,7 @@ class Vector2 {
 	}
 
 	get magnitude() {
-		return Math.sqrt(this.magnitudeSqr());
+		return Math.sqrt(this.magnitudeSqr);
 	}
 
 	get magnitudeSqr() {
@@ -62,7 +66,7 @@ class Vector2 {
 	}
 
 	normalize() {
-		let mag = this.magnitude();
+		let mag = this.magnitude;
 		let vector = this.clone();
 		if (Math.abs(mag) < 1e-9) {
 			vector.x = 0;
@@ -91,6 +95,10 @@ class Vector2 {
 		return vector;
 	}
 
+	get perpendicularClockwise() {
+		return new Vector2(this.y, -this.x);
+	}
+
 	toPrecision(precision) {
 		let vector = this.clone();
 		vector.x = vector.x.toFixed(precision);
@@ -102,6 +110,16 @@ class Vector2 {
 		let vector = this.toPrecision(1);
 		return (`[${vector.x}; ${vector.y}]`);
 	}
+
+	static lerp(start, end, t) {
+		// Calculate the interpolated x and y components
+		const x = start.x + (end.x - start.x) * t;
+		const y = start.y + (end.y - start.y) * t;
+
+		// Create a new Vector2 with the interpolated components
+		return new Vector2(x, y);
+	}
+
 };
 
-export { Vector2 };
+export { Vector2 }
