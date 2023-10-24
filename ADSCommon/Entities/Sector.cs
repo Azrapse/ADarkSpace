@@ -2,7 +2,7 @@
 using MongoDB.Bson;
 using System.Numerics;
 
-namespace ADSTestApp.Entities
+namespace ADSCommon.Entities
 {
     public class Sector
     {

@@ -1,4 +1,4 @@
-﻿namespace ADSTestApp.Data
+﻿namespace ADSCommon.Data
 {
     public class AdsStoreDatabaseSettings
     {

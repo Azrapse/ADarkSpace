@@ -8,14 +8,16 @@ services:
       dockerfile: ADSFront/Dockerfile
     environment:
       DATASTORE_HOST: datastore
+      GAMEPLAYWORKER_HOST: adsgameplayworker
     depends_on:
       - datastore
+      - adsgameplayworker
 
-  adstestapp:
-    image: ${DOCKER_REGISTRY-}adstestapp
+  adsgameplayworker:
+    image: ${DOCKER_REGISTRY-}adsgameplayworker
     build:
       context: .
-      dockerfile: ADSTestApp/Dockerfile
+      dockerfile: ADSGameplayWorker/Dockerfile
     environment:
       DATASTORE_HOST: datastore
     depends_on:

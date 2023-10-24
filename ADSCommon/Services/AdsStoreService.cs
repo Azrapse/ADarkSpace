@@ -1,17 +1,16 @@
-﻿using ADSTestApp.Data;
-using ADSTestApp.Entities;
-using Microsoft.AspNetCore.Identity;
+﻿using ADSCommon.Data;
+using ADSCommon.Entities;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
-namespace ADSTestApp.Services
+namespace ADSCommon.Services
 {
     public class AdsStoreService
     {
         private readonly IMongoCollection<Player> _playersCollection;
         private readonly IMongoCollection<Ship> _shipsCollection;
         private readonly IMongoCollection<Sector> _sectorsCollection;
-
+        private readonly IMongoCollection<Attack> _attacksCollection;
 
         public AdsStoreService(IOptions<AdsStoreDatabaseSettings> adsStoreDatabaseSettings)
         {            
@@ -22,6 +21,7 @@ namespace ADSTestApp.Services
             _playersCollection = mongoDatabase.GetCollection<Player>(adsStoreDatabaseSettings.Value.PlayersCollectionName);
             _shipsCollection = mongoDatabase.GetCollection<Ship>(adsStoreDatabaseSettings.Value.ShipsCollectionName);
             _sectorsCollection = mongoDatabase.GetCollection<Sector>(adsStoreDatabaseSettings.Value.SectorsCollectionName);
+            _attacksCollection = mongoDatabase.GetCollection<Attack>(adsStoreDatabaseSettings.Value.AttacksCollectionName);
         }
 
         public async Task<List<Player>> GetAllPlayersAsync() =>

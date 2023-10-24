@@ -7,16 +7,16 @@ EXPOSE 443
 
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /src
-COPY ["ADSTestApp/ADSTestApp.csproj", "ADSTestApp/"]
-RUN dotnet restore "ADSTestApp/ADSTestApp.csproj"
+COPY ["ADSGameplayWorker/ADSGameplayWorker.csproj", "ADSGameplayWorker/"]
+RUN dotnet restore "ADSGameplayWorker/ADSGameplayWorker.csproj"
 COPY . .
-WORKDIR "/src/ADSTestApp"
-RUN dotnet build "ADSTestApp.csproj" -c Release -o /app/build
+WORKDIR "/src/ADSGameplayWorker"
+RUN dotnet build "ADSGameplayWorker.csproj" -c Release -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "ADSTestApp.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "ADSGameplayWorker.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "ADSTestApp.dll"]
+ENTRYPOINT ["dotnet", "ADSGameplayWorker.dll"]

@@ -28,7 +28,7 @@ app.MapControllerRoute(
 
 app.MapGet("/PollWorker", async () =>
 {
-    var workerUrl = @"http://adstestapp/GetGameState/";
+    var workerUrl = @"http://adsgameplayworker/GetGameState/";
     // Use HttpClient to send an http web request to the worker url to obtain the JSON data.
     var client = new HttpClient();
     var response = await client.GetAsync(workerUrl);

@@ -2,13 +2,17 @@
 using MongoDB.Bson;
 using System.Numerics;
 
-namespace ADSTestApp.Entities
+namespace ADSCommon.Entities
 {
     public class Ship
     {
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
         public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
+        
+                
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string SectorId { get; set; } = "";
         [BsonElement("Name")]
         public string Name { get; set; } = "";
 
