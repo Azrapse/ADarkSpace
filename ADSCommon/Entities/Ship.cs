@@ -12,7 +12,9 @@ namespace ADSCommon.Entities
         
                 
         [BsonRepresentation(BsonType.ObjectId)]
+        [BsonElement("SectorId")]
         public string SectorId { get; set; } = "";
+
         [BsonElement("Name")]
         public string Name { get; set; } = "";
 

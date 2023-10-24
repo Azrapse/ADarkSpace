@@ -151,6 +151,7 @@ export class Ship extends Entity {
         }
         return this._gameobject;
     }
+
     setNextMove(startPosition, startForward, speed, endPosition, endForward, turn, startTime, endTime) {
         this.nextMove.startPosition = startPosition;
         this.nextMove.startForward = startForward;
@@ -232,4 +233,94 @@ export class Ship extends Entity {
         return finalVector;
     }
     
+}
+
+export class Attack {
+    id = "";
+    attacker;
+    defender;
+    damage = 0;
+    amount = 0;
+    startTime = -1;
+    endTime = -1;
+    weaponType = {};
+    result = "";
+    lifetime;
+
+    _duration;
+    _gameobject;
+    _sprite;
+
+    constructor(attackData) {
+        this.id = attackData.id;
+        this.attacker = attackData.attacker;
+        this.defender = attackData.defender;
+        this.damage = attackData.damage;
+        this.amount = attackData.amount;
+        this.startTime = attackData.startTime;
+        this.endTime = attackData.endTime;
+        this.weaponType = attackData.weaponType;
+        this.result = attackData.result;
+        this._duration = this.endTime - this.startTime;
+
+        this.lifetime = 400;
+    }
+
+    get isAlive() {
+        return this.lifetime > 0;
+    }
+
+    get sprite() {
+        if (!this._sprite) {
+            this._sprite = new PIXI.Sprite(PIXI.Texture.from(this.weaponType.img));
+            this._sprite.anchor.set(0.5);
+            this._sprite.scale.set(0.5);
+            this._sprite.rotation -= this.weaponType.imgdir;
+            this._sprite.visible = false;
+        }
+        return this._sprite;
+    }
+
+    get gameobject() {
+        if (!this._gameobject) {
+            this._gameobject = new PIXI.ParticleContainer(1, {
+                scale: true,
+                position: true,
+                rotation: true,
+                uvs: true,
+                alpha: true,
+            });
+            this._gameobject.addChild(this.sprite);
+            this.sprite.visible = false;
+        }        
+        return this._gameobject;
+    }
+
+    update(elapsedTime, parentPivot) {
+        // Do not draw attacks until the second half of the turn.
+        if (elapsedTime < 1600) {
+            return;
+        }
+        const projectileTimePassed = elapsedTime - 1600;
+        // Destroy the attack after 400ms.
+        if (this.lifetime <= 0) {
+            this.sprite.visible = false;
+            this.sprite.destroy();
+            this.gameobject.destroy();
+            return;
+        }
+        const attackerPosition = this.attacker.position;
+        const defenderPosition = this.defender.position;
+        const progress = (projectileTimePassed * this.amount / 400) % 1;
+
+        const midwayPoint = Vector2.lerp(attackerPosition, defenderPosition, progress);
+        const position = new Vector2(parentPivot.x + midwayPoint.x, parentPivot.y - midwayPoint.y);        
+        const direction = defenderPosition.subtract(attackerPosition).normalize().angle();
+                
+        this.sprite.position.set(position.x, position.y);
+        this.sprite.rotation = -direction;
+        this.sprite.visible = true;        
+
+        this.lifetime -= projectileTimePassed - 400;
+    }
 }

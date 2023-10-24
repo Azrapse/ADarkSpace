@@ -1,5 +1,5 @@
 ﻿import { Vector2 } from './Vector2.js';
-import { Sector, Entity, Ship } from './Entities.js';
+import { Sector, Entity, Ship, Attack } from './Entities.js';
 
 const name = "gameclient";
 
@@ -24,12 +24,23 @@ const shipTypes = [
     { name: "Shuttle", img: 'img/shuttle.png', imgdir: Math.PI, speed: 60 },
     { name: "Starwing", img: 'img/starwing.png', imgdir: Math.PI, speed: 90 },
 ];
+
+const weaponTypes = [
+    { name: "Red Laser", img: 'img/red laser.png', imgdir: 0, speed: 100 },
+    { name: "Green Laser", img: 'img/red laser.png', imgdir: 0, speed: 100 },
+    { name: "Missile", img: 'img/red laser.png', imgdir: 0, speed: 100 },
+    { name: "Torpedo", img: 'img/red laser.png', imgdir: 0, speed: 100 },
+];
 /**
  * A dictionary of ship types by id
  */
 const shipTypesDict = {};
 for (const shipType of shipTypes) {
     shipTypesDict[shipType.name] = shipType;
+}
+const weaponTypesDict = {};
+for (const weaponType of weaponTypes) {
+    weaponTypesDict[weaponType.name] = weaponType;
 }
 
 let redDot;
@@ -114,6 +125,8 @@ function createSector() {
  */
 const ships = [];
 const shipDict = {};
+const attacks = [];
+const attackDict = {};
 let sector;
 
 let pollerHandle;
@@ -161,6 +174,38 @@ function hydrateShip(shipData, existingShip) {
     return ship;
 }
 
+function hydrateAttack(attackData, existingAttack) {
+    const weaponType = weaponTypesDict[attackData.weapon];
+    let attack;
+    if (existingAttack) {
+        attack = existingAttack;
+        attack.id = attackData.id;
+        attack.sectorId = attackData.sectorId;
+        attack.weaponType = weaponType;
+        attack.attacker = shipDict[attackData.attackerId];
+        attack.defender = shipDict[attackData.defenderId];
+        attack.startTime = attackData.startTime;
+        attack.endTime = attackData.endTime;
+        attack.amount = attackData.amount;
+        attack.damage = attackData.damage;
+        attack.result = attackData.result;
+    } else {
+        attack = new Attack({
+            id: attackData.id,
+            sectorId: attackData.sectorId,
+            weaponType: weaponType,
+            attacker: shipDict[attackData.attackerId],
+            defender: shipDict[attackData.defenderId],
+            startTime: attackData.startTime,
+            endTime: attackData.endTime,
+            amount: attackData.amount,
+            damage: attackData.damage,
+            result: attackData.result
+        });
+    }
+    return attack;
+}
+
 /**
  * Poll the worker to obtain up-to-date data about the ships in the game sector
  */
@@ -205,6 +250,37 @@ async function synchServerData() {
                     delete shipDict[ship.id];
                 }
             });
+
+            // Update the attacks
+            serverData.attacks
+                .forEach(attackData => {
+                    // Note down the attack id as fetched from the worker
+                    idsFetched[attackData.id] = true;
+                    // Get the attack object from the local dictionary
+                    const oldAttack = attackDict[attackData.id];
+                    // Update the attack object with the data from the worker
+                    const updatedAttack = hydrateAttack(attackData, oldAttack);
+                    // If the attack was not in the local dictionary, add it to the scene
+                    if (!oldAttack) {
+                        attacks.push(updatedAttack);
+                        attackDict[attackData.id] = updatedAttack;
+                        sector.gameobject.addChild(updatedAttack.gameobject);
+                    }
+                });
+            // Remove attacks that were not fetched from the worker.
+            attacks.forEach(attack => {
+                if (!idsFetched[attack.id]) {
+                    attack.sprite.visible = false;
+                    attack.sprite.destroy();
+                    attack.gameobject.removeChild(attack.sprite);
+                    attack.gameobject.destroy();
+                    sector.gameobject.removeChild(attack.gameobject);
+                    attacks.splice(attacks.indexOf(attack), 1);
+                    delete attackDict[attack.id];
+                }
+            });
+
+
             elapsedTimeSinceLastUpdate = 0;
         }
     }
@@ -263,6 +339,12 @@ function frameUpdate() {
     greenDot.x = ships[0].nextMove.endPosition.x;
     greenDot.y = -ships[0].nextMove.endPosition.y;
 
+    // Update the attacks
+    for (const attack of attacks) {
+        if (attack.isAlive) {
+            attack.update(elapsedTimeSinceLastUpdate, attack.gameobject.parent.pivot);
+        }
+    }
 }
 
 
