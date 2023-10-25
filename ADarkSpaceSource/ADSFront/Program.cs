@@ -26,6 +26,8 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
+app.MapControllers();
+
 app.MapGet("/PollWorker", async () =>
 {
     var workerUrl = @$"http://{Environment.GetEnvironmentVariable("GAMEPLAYWORKER_HOST")}/GetGameState/";

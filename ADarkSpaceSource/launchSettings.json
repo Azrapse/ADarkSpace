@@ -9,6 +9,7 @@
       "serviceActions": {
         "adsfront": "StartDebugging",
         "adsgameplayworker": "StartDebugging",
+        "adsloginworker": "StartDebugging",
         "datastore": "StartWithoutDebugging"
       }
     }

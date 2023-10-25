@@ -25,5 +25,32 @@ namespace ADSFront.Controllers
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
         }
 
+        public IActionResult Login()
+        {
+            var loginModel = new LoginViewModel();
+            return View(loginModel);
+        }
+
+        [HttpPost]
+        public IActionResult Login(LoginViewModel model)
+        {
+            // ToDo: Perform the login
+            return RedirectToAction("Index", "Home");
+        }
+               
+
+        public IActionResult Register()
+        {
+            var registerModel = new RegisterViewModel();
+            return View(registerModel);
+        }
+
+        [HttpPost]
+        public IActionResult Register(RegisterViewModel model)
+        {
+            // ToDo: Do the registering.
+            return RedirectToAction("Index", "Home");
+        }
+
     }
 }

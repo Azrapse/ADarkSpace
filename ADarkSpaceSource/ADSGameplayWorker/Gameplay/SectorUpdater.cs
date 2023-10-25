@@ -121,7 +121,7 @@ namespace ADSGameplayWorker.Gameplay
                             StartTime = now,
                             EndTime = now + movementTimeMilliseconds,
                             Damage = 1,
-                            Amount = 3,
+                            Amount = RandomNumberGenerator.GetInt32(3) + 1,
                             Result = "Hit",
                             Weapon = "Red Laser"
                         }

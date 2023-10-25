@@ -31,9 +31,6 @@ namespace ADSCommon.Services
         public async Task<Player?> GetPlayerByIdAsync(string id) =>
             await _playersCollection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
-        public async Task CreatePlayerAsync(Player newPlayer) =>
-            await _playersCollection.InsertOneAsync(newPlayer);
-
         public async Task UpdatePlayerAsync(string id, Player updatedPlayer) =>
             await _playersCollection.ReplaceOneAsync(x => x.Id == id, updatedPlayer);
 
@@ -42,6 +39,18 @@ namespace ADSCommon.Services
 
         public async Task DeleteAllPlayersAsync() =>
             await _playersCollection.DeleteManyAsync(x => true);
+
+        public async Task<Player?> GetPlayerByLoginAsync(string username, string password) =>
+            await _playersCollection.Find(x => x.UserName == username && x.Password == password).FirstOrDefaultAsync();
+
+        public async Task<Player?> GetPlayerByUserNameAsync(string username) =>
+            await _playersCollection.Find(x => x.UserName == username).FirstOrDefaultAsync();
+
+        public async Task<Player> CreatePlayerAsync(Player newPlayer)
+        {
+            await _playersCollection.InsertOneAsync(newPlayer);
+            return newPlayer;
+        }
 
         #endregion
 

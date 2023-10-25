@@ -109,10 +109,10 @@ export class Ship extends Entity {
             this._gameobject.addChild(this.sprite);
 
             // The rectangle boundary
-            const boundary = new PIXI.Graphics()
-                .lineStyle(1, 0xFFFFFF, 1)
-                .drawRect(0, 0, this.sprite.width, this.sprite.height);
-            this._gameobject.addChild(boundary);
+            //const boundary = new PIXI.Graphics()
+            //    .lineStyle(1, 0xFFFFFF, 1)
+            //    .drawRect(0, 0, this.sprite.width, this.sprite.height);
+            //this._gameobject.addChild(boundary);
 
             // The pivot point
             this._gameobject.pivot.x = this._gameobject.width / 2;
@@ -232,7 +232,22 @@ export class Ship extends Entity {
 
         return finalVector;
     }
-    
+
+    update(elapsedTimeSinceLastUpdate, originPoint) {
+        // Update the ship's position and rotation
+        const interpolatedState = this.interpolateMovement(elapsedTimeSinceLastUpdate);
+        this.position = interpolatedState.position;
+        this.forward = interpolatedState.forward;
+
+        // Update the gameobject
+        // The game entities use a coord system where the y axis grow upwards, while PIXI uses a coord system where the y axis grows downwards.
+        // Also, rotations are counterclockwise in the game, while they are clockwise in PIXI.
+        // So we need to do some conversions.
+        this.gameobject.rotation = -this.direction;
+        this.gameobject.x = originPoint.x + this.position.x;
+        this.gameobject.y = originPoint.y - this.position.y;
+
+    }
 }
 
 export class Attack {
@@ -245,11 +260,15 @@ export class Attack {
     endTime = -1;
     weaponType = {};
     result = "";
-    lifetime;
-
+    _lifetime = 0;
+    _startShootingAt = 1600;
+    _endShootingAt = 2000;
     _duration;
     _gameobject;
     _sprite;
+    _shotCount;
+    _currentProjectileIndex = 0;
+    _currentProjectileLifetime = 0;
 
     constructor(attackData) {
         this.id = attackData.id;
@@ -262,12 +281,12 @@ export class Attack {
         this.weaponType = attackData.weaponType;
         this.result = attackData.result;
         this._duration = this.endTime - this.startTime;
-
-        this.lifetime = 400;
+        this._lifetime = 0;        
+        this.gameobject.visible = false;
     }
 
     get isAlive() {
-        return this.lifetime > 0;
+        return this._lifetime < this._endShootingAt && this._currentProjectileIndex < this.amount;
     }
 
     get sprite() {
@@ -296,22 +315,34 @@ export class Attack {
         return this._gameobject;
     }
 
-    update(elapsedTime, parentPivot) {
+    update(deltaTime, parentPivot) {
+        this._lifetime += deltaTime;
+        if (!this.isAlive) {
+            this.gameobject.visible = false;
+            return;
+        }
         // Do not draw attacks until the second half of the turn.
-        if (elapsedTime < 1600) {
+        if (this._lifetime < this._startShootingAt) {
+            this.gameobject.visible = false;
             return;
         }
-        const projectileTimePassed = elapsedTime - 1600;
-        // Destroy the attack after 400ms.
-        if (this.lifetime <= 0) {
-            this.sprite.visible = false;
-            this.sprite.destroy();
-            this.gameobject.destroy();
-            return;
+        this.gameobject.visible = true;
+        const shootingPeriod = this._endShootingAt - this._startShootingAt;
+        const individualProjectilePeriod = shootingPeriod / this.amount;
+
+        if (this._currentProjectileLifetime > individualProjectilePeriod) {
+            this._currentProjectileLifetime = 0;
+            this._currentProjectileIndex++;
         }
-        const attackerPosition = this.attacker.position;
+        // TODO: Fix so that this is more game-friendly. Currently it requires the user to interact with the webpage, and it plays only one track of it.
+        //if (this._currentProjectileLifetime === 0) {
+        //    this.weaponType.sfx.play();
+        //}        
+        this._currentProjectileLifetime += deltaTime;
+
+        const attackerPosition = this.attacker.position.add(this.attacker.forward.scale(30));
         const defenderPosition = this.defender.position;
-        const progress = (projectileTimePassed * this.amount / 400) % 1;
+        const progress = this._currentProjectileLifetime / individualProjectilePeriod;
 
         const midwayPoint = Vector2.lerp(attackerPosition, defenderPosition, progress);
         const position = new Vector2(parentPivot.x + midwayPoint.x, parentPivot.y - midwayPoint.y);        
@@ -320,7 +351,5 @@ export class Attack {
         this.sprite.position.set(position.x, position.y);
         this.sprite.rotation = -direction;
         this.sprite.visible = true;        
-
-        this.lifetime -= projectileTimePassed - 400;
     }
 }

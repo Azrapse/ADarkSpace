@@ -12,30 +12,15 @@ builder.Services.AddSingleton<AdsStoreService>();
 var app = builder.Build();
 var workerName = $"Worker {RandomNumberGenerator.GetInt32(1000)}";
 
-app.MapGet("/", async() =>
+app.MapGet("/ResetSector", async (AdsStoreService storeService) =>
 {
-    using var scope = app.Services.CreateScope();
-    var adsStoreService = scope.ServiceProvider.GetRequiredService<AdsStoreService>();
-    var insertedPlayer = new ADSCommon.Entities.Player { Name = "Test Player"};
-    await adsStoreService.CreatePlayerAsync(insertedPlayer);
-    var fetchedPlayer = await adsStoreService.GetPlayerByIdAsync(insertedPlayer.Id);
-    var fetchAll = await adsStoreService.GetAllPlayersAsync();
-    return Results.Ok(fetchAll);
-});
-
-app.MapGet("/ResetSector", async () =>
-{
-    using var scope = app.Services.CreateScope();
-    var storeService = scope.ServiceProvider.GetRequiredService<AdsStoreService>();
     await storeService.DeleteAllShipsAsync();
     return Results.Ok("All ships deleted.");
 });
 
-app.MapGet("/GetGameState", async()=>
+app.MapGet("/GetGameState", async (AdsStoreService storeService) =>
 {
-    using var scope = app.Services.CreateScope();
-    var storeService = scope.ServiceProvider.GetRequiredService<AdsStoreService>();
-    var sectorUpdater = new SectorUpdater();    
+    var sectorUpdater = new SectorUpdater();
     var result = await sectorUpdater.UpdateSector(storeService, workerName);
     return Results.Ok(result);
 });

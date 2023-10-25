@@ -9,6 +9,14 @@ namespace ADSCommon.Entities
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
         public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
+
+        [BsonElement("UserName")]
+        public string UserName { get; set; } = "";
+        [BsonElement("Password")]
+        public string Password { get; set; } = "";
+        [BsonElement("EMail")]
+        public string EMail { get; set; } = "";
+        
         [BsonElement("Name")]
         public string Name { get; set; } = "";
 

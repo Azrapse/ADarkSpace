@@ -26,11 +26,12 @@ const shipTypes = [
 ];
 
 const weaponTypes = [
-    { name: "Red Laser", img: 'img/red laser.png', imgdir: 0, speed: 100 },
+    { name: "Red Laser", img: 'img/red laser.png', imgdir: 0, speed: 100, sfx: new Audio('sfx/green laser.mp3') },
     { name: "Green Laser", img: 'img/red laser.png', imgdir: 0, speed: 100 },
     { name: "Missile", img: 'img/red laser.png', imgdir: 0, speed: 100 },
     { name: "Torpedo", img: 'img/red laser.png', imgdir: 0, speed: 100 },
 ];
+
 /**
  * A dictionary of ship types by id
  */
@@ -42,9 +43,6 @@ const weaponTypesDict = {};
 for (const weaponType of weaponTypes) {
     weaponTypesDict[weaponType.name] = weaponType;
 }
-
-let redDot;
-let greenDot;
 
 function createSector() {
     const sectorRadius = 2000;
@@ -60,24 +58,6 @@ function createSector() {
     container.pivot.y = container.height / 2;
     container.x = app.screen.width / 2;
     container.y = app.screen.height / 2;
-
-    redDot = new PIXI.Graphics()
-        .lineStyle(1, 0xFF0000, 1)
-        .beginFill(0xAA0000)
-        .drawCircle(container.pivot.x, container.pivot.y, 5)
-        .endFill();
-    redDot.zIndex = 1000;
-    container.addChild(redDot);
-
-    greenDot = new PIXI.Graphics()
-        .lineStyle(1, 0x00FF00, 1)
-        .beginFill(0x00AA00)
-        .drawCircle(container.pivot.x, container.pivot.y, 5)
-        .endFill();
-    greenDot.zIndex = 1001;
-
-    container.addChild(greenDot);
-
     app.stage.addChild(container);
 
     container.eventMode = 'static';
@@ -121,7 +101,7 @@ function createSector() {
 
 
 /**
- * The ships that are currently in the game
+ * The ships and attacks that are currently in the game
  */
 const ships = [];
 const shipDict = {};
@@ -227,59 +207,7 @@ async function synchServerData() {
                 return;
             }            
             // Update the ships
-            serverData.ships
-                .forEach(shipData => {
-                    // Note down the ship id as fetched from the worker
-                    idsFetched[shipData.id] = true;
-                    // Get the ship object from the local dictionary
-                    const oldShip = shipDict[shipData.id];
-                    // Update the ship object with the data from the worker
-                    const updatedShip = hydrateShip(shipData, oldShip);
-                    // If the ship was not in the local dictionary, add it to the scene
-                    if (!oldShip) {
-                        ships.push(updatedShip);
-                        shipDict[shipData.id] = updatedShip;
-                        sector.gameobject.addChild(updatedShip.gameobject);
-                    }
-                });
-            // Remove ships that were not fetched from the worker. They must have been destroyed or something.
-            ships.forEach(ship => {
-                if (!idsFetched[ship.id]) {
-                    sector.gameobject.removeChild(ship.gameobject);
-                    ships.splice(ships.indexOf(ship), 1);
-                    delete shipDict[ship.id];
-                }
-            });
-
-            // Update the attacks
-            serverData.attacks
-                .forEach(attackData => {
-                    // Note down the attack id as fetched from the worker
-                    idsFetched[attackData.id] = true;
-                    // Get the attack object from the local dictionary
-                    const oldAttack = attackDict[attackData.id];
-                    // Update the attack object with the data from the worker
-                    const updatedAttack = hydrateAttack(attackData, oldAttack);
-                    // If the attack was not in the local dictionary, add it to the scene
-                    if (!oldAttack) {
-                        attacks.push(updatedAttack);
-                        attackDict[attackData.id] = updatedAttack;
-                        sector.gameobject.addChild(updatedAttack.gameobject);
-                    }
-                });
-            // Remove attacks that were not fetched from the worker.
-            attacks.forEach(attack => {
-                if (!idsFetched[attack.id]) {
-                    attack.sprite.visible = false;
-                    attack.sprite.destroy();
-                    attack.gameobject.removeChild(attack.sprite);
-                    attack.gameobject.destroy();
-                    sector.gameobject.removeChild(attack.gameobject);
-                    attacks.splice(attacks.indexOf(attack), 1);
-                    delete attackDict[attack.id];
-                }
-            });
-
+            synchEntities(serverData, idsFetched);
 
             elapsedTimeSinceLastUpdate = 0;
         }
@@ -287,6 +215,57 @@ async function synchServerData() {
     catch (error) {
         console.log(error);
     }        
+}
+function synchEntities(serverData, idsFetched) {
+    serverData.ships
+        .forEach(shipData => {
+            // Note down the ship id as fetched from the worker
+            idsFetched[shipData.id] = true;
+            // Get the ship object from the local dictionary
+            const oldShip = shipDict[shipData.id];
+            // Update the ship object with the data from the worker
+            const updatedShip = hydrateShip(shipData, oldShip);
+            // If the ship was not in the local dictionary, add it to the scene
+            if (!oldShip) {
+                ships.push(updatedShip);
+                shipDict[shipData.id] = updatedShip;
+                sector.gameobject.addChild(updatedShip.gameobject);
+            }
+        });
+    // Remove ships that were not fetched from the worker. They must have been destroyed or something.
+    ships.forEach(ship => {
+        if (!idsFetched[ship.id]) {
+            sector.gameobject.removeChild(ship.gameobject);
+            ships.splice(ships.indexOf(ship), 1);
+            delete shipDict[ship.id];
+        }
+    });
+
+    // Update the attacks
+    serverData.attacks
+        .forEach(attackData => {
+            // Note down the attack id as fetched from the worker
+            idsFetched[attackData.id] = true;
+            // Get the attack object from the local dictionary
+            const oldAttack = attackDict[attackData.id];
+            // Update the attack object with the data from the worker
+            const updatedAttack = hydrateAttack(attackData, oldAttack);
+            // If the attack was not in the local dictionary, add it to the scene
+            if (!oldAttack) {
+                attacks.push(updatedAttack);
+                attackDict[attackData.id] = updatedAttack;
+                sector.gameobject.addChild(updatedAttack.gameobject);
+            }
+        });
+    // Remove attacks that were not fetched from the worker.
+    attacks.forEach(attack => {
+        if (!idsFetched[attack.id]) {
+            attack.sprite.visible = false;          
+            sector.gameobject.removeChild(attack.gameobject);
+            attacks.splice(attacks.indexOf(attack), 1);
+            delete attackDict[attack.id];
+        }
+    });
 }
 
 
@@ -319,34 +298,17 @@ function frameUpdate() {
     if (now < 0) {
         return;
     }
-
+    const originPoint = new Vector2(sector.gameobject.pivot.x, sector.gameobject.pivot.y);
+    // Update the position of the ships
     for (const ship of ships) {
-        // Update the ship's position and rotation
-        const interpolatedState = ship.interpolateMovement(elapsedTimeSinceLastUpdate);
-        ship.position = interpolatedState.position;
-        ship.forward = interpolatedState.forward;
-
-        // Update the gameobject
-        // The game entities use a coord system where the y axis grow upwards, while PIXI uses a coord system where the y axis grows downwards.
-        // Also, rotations are counterclockwise in the game, while they are clockwise in PIXI.
-        // So we need to do some conversions.
-        ship.gameobject.rotation = -ship.direction;
-        ship.gameobject.x = ship.gameobject.parent.pivot.x + ship.position.x;
-        ship.gameobject.y = ship.gameobject.parent.pivot.y - ship.position.y;
+        ship.update(elapsedTimeSinceLastUpdate, originPoint);
     }
-    redDot.x = ships[0].nextMove.startPosition.x;
-    redDot.y = -ships[0].nextMove.startPosition.y;
-    greenDot.x = ships[0].nextMove.endPosition.x;
-    greenDot.y = -ships[0].nextMove.endPosition.y;
 
     // Update the attacks
     for (const attack of attacks) {
-        if (attack.isAlive) {
-            attack.update(elapsedTimeSinceLastUpdate, attack.gameobject.parent.pivot);
-        }
+        attack.update(dt, originPoint);
     }
 }
-
 
 function end() {
     clearInterval(pollerHandle);

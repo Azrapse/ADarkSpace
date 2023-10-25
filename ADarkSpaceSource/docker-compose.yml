@@ -10,8 +10,18 @@ services:
       DATASTORE_HOST: datastore
       GAMEPLAYWORKER_HOST: adsgameplayworker
     depends_on:
-      - datastore
+      - adsloginworker
       - adsgameplayworker
+
+  adsloginworker:
+    image: ${DOCKER_REGISTRY-}adsloginworker
+    build:
+      context: .
+      dockerfile: ADSLoginWorker/Dockerfile
+    environment:
+      DATASTORE_HOST: datastore
+    depends_on:
+      - datastore
 
   adsgameplayworker:
     image: ${DOCKER_REGISTRY-}adsgameplayworker
