@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: ADSFront/Dockerfile
     environment:
-      DATASTORE_HOST: datastore
+      LOGINWORKER_HOST: adsloginworker
       GAMEPLAYWORKER_HOST: adsgameplayworker
     depends_on:
       - adsloginworker

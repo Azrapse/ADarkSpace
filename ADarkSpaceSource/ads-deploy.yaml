@@ -1,0 +1,252 @@
+# Namespace for DNS access within cluster
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: adarksector
+  labels:
+    name: adarksector
+
+# Front workers deployment
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: front
+  namespace: adarksector
+  labels:
+    app: front
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: front
+    spec:
+      containers:
+      - name: adsfront
+        image: azrapse/adsfront:latest
+        ports:
+        - containerPort: 80
+        - containerPort: 443
+        env:
+        - name: ASPNETCORE_URLS
+          value: http://*:80
+        - name: ASPNETCORE_ENVIRONMENT
+          value: Development
+        - name: LOGINWORKER_HOST
+          value: login-service.adarksector
+        - name: GAMEPLAYWORKER_HOST
+          value: gameplay-service.adarksector
+  selector:
+    matchLabels:
+      app: front
+# Login workers deployment
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: login
+  namespace: adarksector
+  labels:
+    app: login
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: login
+    spec:
+      containers:
+      - name: adsloginworker
+        image: azrapse/adsloginworker:latest
+        ports:
+        - containerPort: 80
+        - containerPort: 443
+        env:
+        - name: ASPNETCORE_URLS
+          value: http://*:80
+        - name: DATASTORE_HOST
+          value: datastore-service.adarksector
+  selector:
+    matchLabels:
+      app: login
+# Gameplay workers deployment
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gameplay
+  namespace: adarksector
+  labels:
+    app: gameplay
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: gameplay
+    spec:
+      containers:
+      - name: adsgameplayworker
+        image: azrapse/adsgameplayworker:latest
+        ports:
+        - containerPort: 80
+        - containerPort: 443
+        env:
+        - name: ASPNETCORE_URLS
+          value: http://*:80
+        - name: ASPNETCORE_ENVIRONMENT
+          value: Development
+        - name: DATASTORE_HOST
+          value: datastore-service.adarksector
+  selector:
+    matchLabels:
+      app: gameplay
+
+# Front service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: front-service
+  namespace: adarksector
+  labels: 
+    app: front
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    protocol: TCP
+    port: 8080
+    targetPort: 80
+  - name: https
+    protocol: TCP
+    port: 8443
+    targetPort: 443
+  selector:
+    app: front
+# Login service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: login-service
+  namespace: adarksector
+  labels: 
+    app: login
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 80
+  - name: https
+    protocol: TCP
+    port: 443
+    targetPort: 443
+  selector:
+    app: login
+# Gameplay service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gameplay-service
+  namespace: adarksector
+  labels: 
+    app: gameplay
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 80
+  - name: https
+    protocol: TCP
+    port: 443
+    targetPort: 443
+  selector:
+    app: gameplay
+# DataStore
+# --------------------
+# - one container per pod running the image mongodb
+# - one headless service to access them.
+# - Two persistentVolumeClaims/mounts: datastore-data, and mongo-config
+
+# DataStore StatefulSet
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: datastore
+  namespace: adarksector
+  labels:
+    app: datastore
+spec:
+  serviceName: mongodb
+  replicas: 1
+  selector:
+    matchLabels:
+      app: datastore
+  template:
+    metadata:
+      labels:
+        app: datastore
+    spec:
+      containers:
+      - name: datastore
+        image: mongo
+        ports:
+        - containerPort: 27017
+          name: mongodb-port
+        volumeMounts:
+        - name: datastore-data
+          mountPath: /data/db
+        - name: mongo-config
+          mountPath: /data/configdb
+  volumeClaimTemplates:
+    - metadata:
+        name: datastore-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests: 
+            storage: 10Mi
+    - metadata:
+        name: mongo-config
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests: 
+            storage: 5Mi          
+
+# DataStore Headless Service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: datastore-service
+  namespace: adarksector
+  labels:
+    app: datastore
+spec:
+  ports:
+  - port: 27017
+    targetPort: mongodb-port
+  selector:
+    app: datastore
+---
+# ConfigMap to store DATASTORE_HOST, LOGINWORKER_HOST, and GAMEPLAYWORKER_HOST variables in
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: adarksector-config
+  labels:
+    data: config
+data:
+  datastore_host: datastore.adarksector
+  loginworker_host: login.adarksector
+  gameplayworker_host: gameplay.adarksector
+---

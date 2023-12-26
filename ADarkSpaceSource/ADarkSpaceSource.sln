@@ -17,7 +17,12 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ADSFront", "ADSFront\ADSFro
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ADSCommon", "ADSCommon\ADSCommon.csproj", "{703FE005-4805-490E-B91D-67D9774D2A2A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ADSLoginWorker", "ADSLoginWorker\ADSLoginWorker.csproj", "{1375D556-B781-4B1F-BD8B-703C0D6A1F0F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ADSLoginWorker", "ADSLoginWorker\ADSLoginWorker.csproj", "{1375D556-B781-4B1F-BD8B-703C0D6A1F0F}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{03CAC3C5-B12F-4D1B-815D-AF77DC171DA3}"
+	ProjectSection(SolutionItems) = preProject
+		ads-deploy.yaml = ads-deploy.yaml
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

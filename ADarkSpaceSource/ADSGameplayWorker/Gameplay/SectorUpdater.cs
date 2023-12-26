@@ -1,5 +1,7 @@
 ﻿using ADSCommon.Entities;
 using ADSCommon.Services;
+using ADSCommon.Util;
+using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using System.Security.Cryptography;
 
@@ -14,10 +16,14 @@ namespace ADSGameplayWorker.Gameplay
         Sector? sector;
         List<Ship>? ships;
         List<Attack>? attacks;
+        long previousUpdateTimeSlot;
 
         public async Task<SectorGameState> UpdateSector(AdsStoreService storeService, string workerName)
         {
             var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            // Calculate when was the last time the sector was updated (even if it was before it existed).
+            // It is updated on a regular 'movementTimeMilliseconds' interval.
+            previousUpdateTimeSlot = (now / movementTimeMilliseconds) * movementTimeMilliseconds;
             var paralellizableAwaits = new List<Task>();
 
             // Get the one sector, or create it.
@@ -29,7 +35,7 @@ namespace ADSGameplayWorker.Gameplay
                 {
                     Name = "Test sector",
                     LastUpdateTime = now,
-                    NextUpdateTime = now + movementTimeMilliseconds,
+                    NextUpdateTime = previousUpdateTimeSlot + movementTimeMilliseconds,
                     UpdatedBy = "None",
                     Time = now
                 };
@@ -45,7 +51,7 @@ namespace ADSGameplayWorker.Gameplay
             // If the sector wasn't updated in the last 4 seconds, force a takeover.
             var forceTakeOverIfLastModifiedBefore = now - 4000;
             var lockedSector = await storeService.LockSectorForModificationAsync(sector.Id, workerName, forceTakeOverIfLastModifiedBefore);
-            // Check we managed to lock the sector for modification, and it's due for an update
+            // Check whether we managed to lock the sector for modification, and it's due for an update
             if (lockedSector is not null && lockedSector.NextUpdateTime < now)
             {
                 try
@@ -54,53 +60,15 @@ namespace ADSGameplayWorker.Gameplay
                     if (ships.Count == 0)
                     {
                         var shipCount = RandomNumberGenerator.GetInt32(5) + 2;
-                        ships = (from i in Enumerable.Range(0, shipCount)
-                                 let type = Ship.ShipTypes[RandomNumberGenerator.GetInt32(Ship.ShipTypes.Count)]
-                                 let startPosition = new Vector2(RandomNumberGenerator.GetInt32(1000) - 500, RandomNumberGenerator.GetInt32(1000) - 500)
-                                 let startDirection = RandomNumberGenerator.GetInt32(4) * (float)Math.PI / 2
-                                 let targetTurn = (RandomNumberGenerator.GetInt32(5) - 2) * (float)Math.PI / 4
-                                 let endDirection = startDirection + targetTurn
-                                 let startForward = new Vector2(MathF.Cos(startDirection), MathF.Sin(startDirection))
-                                 let endForward = new Vector2(MathF.Cos(endDirection), MathF.Sin(endDirection))
-                                 let speed = 100
-                                 let endPosition = CalculateEndPosition(startPosition, startForward, endForward, targetTurn, speed, movementTimeMilliseconds)
-                                 select new Ship
-                                 {
-                                     Name = $"{type} #{i}",
-                                     SectorId = sector.Id,
-                                     ShipType = type,
-                                     StartPositionX = startPosition.X,
-                                     StartPositionY = startPosition.Y,
-                                     StartForwardX = startForward.X,
-                                     StartForwardY = startForward.Y,
-                                     EndPositionX = endPosition.X,
-                                     EndPositionY = endPosition.Y,
-                                     EndForwardX = endForward.X,
-                                     EndForwardY = endForward.Y,
-                                     TargetTurn = targetTurn,
-                                     Speed = speed,
-                                     MovementStartTime = now,
-                                     MovementEndTime = now + movementTimeMilliseconds
-                                 })
-                        .ToList();
+                        GenerateShips(shipCount);
                         paralellizableAwaits.Add(storeService.CreateShipsAsync(ships));
                     }
                     else
                     {
+                        // If there exists some ships, update their positions.
                         foreach (var ship in ships)
                         {
-                            ship.MovementStartTime = now;
-                            ship.MovementEndTime = now + movementTimeMilliseconds;
-                            ship.Speed = 200;
-                            ship.StartPosition = ship.EndPosition;
-                            if (ship.StartPosition.Length() > 2000)
-                            {
-                                ship.StartPosition = Vector2.Zero;
-                            }
-                            ship.StartForward = ship.EndForward;
-                            ship.TargetTurn = (RandomNumberGenerator.GetInt32(5) - 2) * (float)Math.PI / 4;
-                            ship.EndForward = RotateVector2(ship.StartForward, ship.TargetTurn);
-                            ship.EndPosition = CalculateEndPosition(ship.StartPosition, ship.StartForward, ship.EndForward, ship.TargetTurn, ship.Speed, movementTimeMilliseconds);
+                            UpdateShip(ship);
 
                             paralellizableAwaits.Add(storeService.UpdateShipAsync(ship.Id, ship));
                         }
@@ -109,23 +77,7 @@ namespace ADSGameplayWorker.Gameplay
                     // Remove all old attacks
                     await storeService.DeleteAllAttacksInSectorBeforeAsync(sector.Id, sector.LastUpdateTime);
                     // Determine if any ships are attacking
-                    attacks = (
-                        from ship in ships
-                        let target = ClosestTargetInArc(ship)
-                        where target is not null
-                        select new Attack
-                        {
-                            SectorId = sector.Id,
-                            AttackerId = ship.Id,
-                            DefenderId = target.Id,
-                            StartTime = now,
-                            EndTime = now + movementTimeMilliseconds,
-                            Damage = 1,
-                            Amount = RandomNumberGenerator.GetInt32(3) + 1,
-                            Result = "Hit",
-                            Weapon = "Red Laser"
-                        }
-                        ).ToList();
+                    attacks = GenerateAttacks();
                     if (attacks.Count > 0)
                     {
                         paralellizableAwaits.Add(storeService.CreateAttacksAsync(attacks));
@@ -135,8 +87,8 @@ namespace ADSGameplayWorker.Gameplay
                     await Task.WhenAll(paralellizableAwaits);
                     // Update the sector by releasing it for another worker and setting the next update time.
                     sector.UpdatedBy = "None";
-                    sector.NextUpdateTime = now + movementTimeMilliseconds;
-                    sector.LastUpdateTime = now;
+                    sector.NextUpdateTime = previousUpdateTimeSlot + movementTimeMilliseconds;
+                    sector.LastUpdateTime = previousUpdateTimeSlot;
                     await storeService.UpdateSectorAsync(sector.Id, sector);
                 }
                 finally
@@ -158,6 +110,102 @@ namespace ADSGameplayWorker.Gameplay
                 Attacks = attacks
             };
             return result;
+        }
+                
+        private List<Attack> GenerateAttacks()
+        {
+            if (sector is null)
+            {
+                throw new InvalidOperationException($"{nameof(sector)} is null");
+            }
+            return (
+                from ship in ships
+                let target = ClosestTargetInArc(ship)
+                where target is not null
+                select new Attack
+                {
+                    SectorId = sector.Id,
+                    AttackerId = ship.Id,
+                    DefenderId = target.Id,
+                    StartTime = previousUpdateTimeSlot,
+                    EndTime = previousUpdateTimeSlot + movementTimeMilliseconds,
+                    Damage = 1,
+                    Amount = RandomNumberGenerator.GetInt32(3) + 1,
+                    Result = "Hit",
+                    Weapon = "Red Laser"
+                }
+                ).ToList();
+        }
+
+        private void GenerateShips(int shipCount)
+        {
+            if (sector is null)
+            {
+                throw new InvalidOperationException($"{nameof(sector)} is null");
+            }
+            ships = (from i in Enumerable.Range(0, shipCount)
+                     let type = Ship.ShipTypes[RandomNumberGenerator.GetInt32(Ship.ShipTypes.Count)]
+                     let startPosition = new Vector2(RandomNumberGenerator.GetInt32(1000) - 500, RandomNumberGenerator.GetInt32(1000) - 500)
+                     let startDirection = RandomNumberGenerator.GetInt32(4) * MathF.PI / 2
+                     let targetTurn = (RandomNumberGenerator.GetInt32(5) - 2) * MathF.PI / 4
+                     let endDirection = startDirection + targetTurn
+                     let startForward = new Vector2(MathF.Cos(startDirection), MathF.Sin(startDirection))
+                     let endForward = new Vector2(MathF.Cos(endDirection), MathF.Sin(endDirection))
+                     let speed = 100
+                     let endPosition = CalculateEndPosition(startPosition, startForward, endForward, targetTurn, speed, movementTimeMilliseconds)
+                     select new Ship
+                     {
+                         Name = $"{type} #{i}",
+                         SectorId = sector.Id,
+                         ShipType = type,
+                         StartPositionX = startPosition.X,
+                         StartPositionY = startPosition.Y,
+                         StartForwardX = startForward.X,
+                         StartForwardY = startForward.Y,
+                         EndPositionX = endPosition.X,
+                         EndPositionY = endPosition.Y,
+                         EndForwardX = endForward.X,
+                         EndForwardY = endForward.Y,
+                         TargetTurn = targetTurn,
+                         Speed = speed,
+                         MovementStartTime = previousUpdateTimeSlot,
+                         MovementEndTime = previousUpdateTimeSlot + movementTimeMilliseconds
+                     })
+            .ToList();
+        }
+
+        private void UpdateShip(Ship ship)
+        {
+            ship.MovementStartTime = previousUpdateTimeSlot;
+            ship.MovementEndTime = previousUpdateTimeSlot + movementTimeMilliseconds;
+            ship.Speed = 200;
+            ship.StartPosition = ship.EndPosition;
+            ship.StartForward = ship.EndForward;
+            var centerwards = (Vector2.Zero - ship.StartPosition).Normalized();
+            // If the ship is too far away, turn around.
+            if (ship.StartPosition.Length() > 1900)
+            {
+                // If the ship is not facing towards the center, turn to face the center.
+                var signedAngle = ship.StartForward.AngleTo(centerwards);
+                var isFacingCenterwards = MathF.Abs(signedAngle) <= MathF.PI / 4;
+                if (!isFacingCenterwards)
+                {
+                    // The ship will turn 90 degrees to face the center of the sector.                     
+                    // Left or right depending on what is the shortest turn towards (0, 0)                    
+                    ship.TargetTurn = MathF.PI / 2 * MathF.Sign(signedAngle);
+                }
+                else
+                {
+                    ship.TargetTurn = 0;
+                }
+            }
+            else
+            {
+                // Otherwise, choose a random direction
+                ship.TargetTurn = (RandomNumberGenerator.GetInt32(5) - 2) * MathF.PI / 4;
+            }
+            ship.EndForward = ship.StartForward.Rotate(ship.TargetTurn);
+            ship.EndPosition = CalculateEndPosition(ship.StartPosition, ship.StartForward, ship.EndForward, ship.TargetTurn, ship.Speed, movementTimeMilliseconds);
         }
 
         Ship? ClosestTargetInArc(Ship attacker)
@@ -201,7 +249,7 @@ namespace ADSGameplayWorker.Gameplay
         static Vector2 CalculateEndPosition(Vector2 startPosition, Vector2 startForward, Vector2 endForward, float turn, float speed, int movementTime)
         {
             // Normalize the forward and targetForward vectors
-            var normalizedStartForward = Vector2.Normalize(startForward);
+            var normalizedStartForward = startForward.Normalized();
 
             // If there is no direction change, then the forward direction is constant, and the position is linear.
             if (MathF.Abs(turn) < 0.00001)
@@ -215,38 +263,13 @@ namespace ADSGameplayWorker.Gameplay
                 var radius = speed * movementTime / 1000 / turn;
 
                 // Translate the vectorToMove a distance of radius, depending on whether we are turning right or left.        
-                var translationVector = PerpendicularClockwise(normalizedStartForward) * radius;
+                var translationVector = normalizedStartForward.PerpendicularClockwise() * radius;
 
-                var originRotatedAroundRadius = TranslateRotateTranslate(Vector2.Zero, translationVector, turn);
+                var originRotatedAroundRadius = Vector2.Zero.TranslateRotateTranslate(translationVector, turn);
                 var finalPosition = startPosition + originRotatedAroundRadius;
 
                 return finalPosition;
             }
-        }
-
-        static Vector2 PerpendicularClockwise(Vector2 v)
-        {
-            return new Vector2(v.Y, -v.X);
-        }
-
-        static Vector2 RotateVector2(Vector2 vector, float angleInRadians)
-        {
-            var cos = MathF.Cos(angleInRadians);
-            var sin = MathF.Sin(angleInRadians);
-            var x = vector.X * cos - vector.Y * sin;
-            var y = vector.X * sin + vector.Y * cos;
-            return new Vector2(x, y);
-        }
-
-        static Vector2 TranslateRotateTranslate(Vector2 vector, Vector2 translation, float angle)
-        {
-            // Translate the vector
-            var translatedVector = vector + translation;
-            // Rotate the translated vector
-            var rotatedVector = RotateVector2(translatedVector, angle);
-            // Translate the rotated vector back
-            var finalVector = rotatedVector - translation;
-            return finalVector;
         }
     }
 

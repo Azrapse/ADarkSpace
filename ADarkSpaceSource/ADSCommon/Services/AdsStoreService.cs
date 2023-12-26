@@ -13,7 +13,7 @@ namespace ADSCommon.Services
         private readonly IMongoCollection<Attack> _attacksCollection;
 
         public AdsStoreService(IOptions<AdsStoreDatabaseSettings> adsStoreDatabaseSettings)
-        {            
+        {
             var databaseHost = Environment.GetEnvironmentVariable("DATASTORE_HOST") ?? "localhost";
             var connectionString = adsStoreDatabaseSettings.Value.ConnectionString.Replace("localhost", databaseHost);
             var mongoClient = new MongoClient(connectionString);
