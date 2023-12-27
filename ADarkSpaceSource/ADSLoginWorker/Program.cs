@@ -1,7 +1,6 @@
 using ADSCommon.Data;
 using ADSCommon.Entities;
 using ADSCommon.Services;
-using ADSLogin;
 
 var builder = WebApplication.CreateBuilder(args);
 // Add services to the container
@@ -22,7 +21,7 @@ app.MapPost("/Login", async (LoginData loginData, AdsStoreService storeService) 
 
 app.MapPost("/Register", async (RegisterData registerData, AdsStoreService storeService) =>
 {
-    var player = storeService.GetPlayerByUserNameAsync(registerData.UserName);
+    var player = await storeService.GetPlayerByUserNameAsync(registerData.UserName);
     if (player is not null)
     {
         return Results.BadRequest("Username already exists");
@@ -47,9 +46,3 @@ app.MapPost("/Register", async (RegisterData registerData, AdsStoreService store
 });
 
 app.Run();
-
-namespace ADSLogin
-{
-    record LoginData(string UserName, string Password, string DisplayName);
-    record RegisterData(string UserName, string Password, string DisplayName, string Email, string ConfirmPassword);
-}

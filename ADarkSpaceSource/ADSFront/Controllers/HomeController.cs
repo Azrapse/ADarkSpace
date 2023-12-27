@@ -1,4 +1,7 @@
-﻿using ADSFront.Models;
+﻿using ADSCommon.Data;
+using ADSCommon.Entities;
+using ADSFront.Models;
+using ADSFront.Util;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 using System.Net;
@@ -27,30 +30,70 @@ namespace ADSFront.Controllers
 
         public IActionResult Login()
         {
+            ViewBag.Message = TempData["Message"];
             var loginModel = new LoginViewModel();
             return View(loginModel);
         }
 
         [HttpPost]
-        public IActionResult Login(LoginViewModel model)
+        public async Task<IActionResult> Login(LoginViewModel model)
         {
-            // ToDo: Perform the login
-            return RedirectToAction("Index", "Home");
+            var loginUrl = @$"http://{Environment.GetEnvironmentVariable("LOGINWORKER_HOST")}/Login/";
+            // Use HttpClient to send an http web request to the worker url to obtain the JSON data.
+            var client = new HttpClient();
+            var loginData = new LoginData(model.UserName, model.Password);
+            var response = await client.PostAsync(loginUrl, JsonContent.Create(loginData));
+            if (response.IsSuccessStatusCode)
+            {
+                var player = await response.Content.ReadFromJsonAsync<Player>();
+                HttpContext.Session.Set("Player", player);
+                return RedirectToAction("Play", "Home");
+            }
+            else
+            {                
+                TempData["Message"] = await response.Content.ReadAsStringAsync();
+                return RedirectToAction("Login", "Home");
+            }
         }
                
 
         public IActionResult Register()
         {
+            ViewBag.Message = TempData["Message"];
             var registerModel = new RegisterViewModel();
             return View(registerModel);
         }
 
         [HttpPost]
-        public IActionResult Register(RegisterViewModel model)
+        public async Task<IActionResult> Register(RegisterViewModel model)
         {
-            // ToDo: Do the registering.
-            return RedirectToAction("Index", "Home");
+            var registerUrl = @$"http://{Environment.GetEnvironmentVariable("LOGINWORKER_HOST")}/Register/";
+            // Use HttpClient to send an http web request to the worker url to obtain the JSON data.
+            var client = new HttpClient();
+            var registerData = new RegisterData(model.UserName, model.Password, model.Name, model.EMail, model.ConfirmPassword);
+            var response = await client.PostAsync(registerUrl, JsonContent.Create(registerData));
+            if (response.IsSuccessStatusCode)
+            {
+                var player = await response.Content.ReadFromJsonAsync<Player>();
+                HttpContext.Session.Set("Player", player);
+                return RedirectToAction("Play", "Home");
+            }
+            else
+            {
+                TempData["Message"] = await response.Content.ReadAsStringAsync();
+                return RedirectToAction("Register", "Home");
+            }            
         }
 
+        public IActionResult Play()
+        {
+            var player = HttpContext.Session.Get<Player>("Player");
+            if (player is null)
+            {
+                TempData["Message"] = "You must login first";
+                return RedirectToAction("Login", "Home");
+            }
+            return View(player);
+        }
     }
 }

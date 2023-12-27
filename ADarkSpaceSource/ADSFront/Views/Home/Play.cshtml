@@ -1,0 +1,9 @@
+﻿@model ADSCommon.Entities.Player
+@{
+    ViewData["Title"] = $"A Dark Sector - {Model.Name}";
+}
+@section Scripts
+{
+    <script src="~/lib/pixi.js/pixi.js"></script>
+    <script src="~/js/play.js" asp-append-version="true" type="module"></script>
+}

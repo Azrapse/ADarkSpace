@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - ADSFront</title>
+    <title>@ViewData["Title"]</title>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/ADSFront.styles.css" asp-append-version="true" />
 </head>
@@ -14,8 +14,6 @@
         </main>
     </div>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/pixi.js/pixi.js"></script>
-    <script src="~/js/site.js" asp-append-version="true" type="module"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

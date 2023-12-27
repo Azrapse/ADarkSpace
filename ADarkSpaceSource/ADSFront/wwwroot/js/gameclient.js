@@ -12,24 +12,24 @@ let app;
  * The types of ships that can be spawned
  */
 const shipTypes = [
-    { name: "X-Wing", img: 'img/x-wing.png', imgdir: Math.PI, speed: 100 },
-    { name: "A-Wing", img: 'img/a-wing.png', imgdir: Math.PI, speed: 120 },
-    { name: "Y-Wing", img: 'img/y-wing.png', imgdir: Math.PI, speed: 80 },
-    { name: "B-Wing", img: 'img/b-wing.png', imgdir: Math.PI, speed: 90 },
-    { name: "TIE Fighter", img: 'img/t-f.png', imgdir: Math.PI, speed: 100 },
-    { name: "TIE Interceptor", img: 'img/t-i.png', imgdir: Math.PI, speed: 115 },
-    { name: "TIE Bomber", img: 'img/t-b.png', imgdir: Math.PI, speed: 180 },
-    { name: "TIE Advanced", img: 'img/t-a.png', imgdir: Math.PI, speed: 120 },
-    { name: "TIE Defender", img: 'img/t-d.png', imgdir: Math.PI, speed: 120 },
-    { name: "Shuttle", img: 'img/shuttle.png', imgdir: Math.PI, speed: 60 },
-    { name: "Starwing", img: 'img/starwing.png', imgdir: Math.PI, speed: 90 },
+    { name: "X-Wing", img: '/img/x-wing.png', imgdir: Math.PI, speed: 100 },
+    { name: "A-Wing", img: '/img/a-wing.png', imgdir: Math.PI, speed: 120 },
+    { name: "Y-Wing", img: '/img/y-wing.png', imgdir: Math.PI, speed: 80 },
+    { name: "B-Wing", img: '/img/b-wing.png', imgdir: Math.PI, speed: 90 },
+    { name: "TIE Fighter", img: '/img/t-f.png', imgdir: Math.PI, speed: 100 },
+    { name: "TIE Interceptor", img: '/img/t-i.png', imgdir: Math.PI, speed: 115 },
+    { name: "TIE Bomber", img: '/img/t-b.png', imgdir: Math.PI, speed: 180 },
+    { name: "TIE Advanced", img: '/img/t-a.png', imgdir: Math.PI, speed: 120 },
+    { name: "TIE Defender", img: '/img/t-d.png', imgdir: Math.PI, speed: 120 },
+    { name: "Shuttle", img: '/img/shuttle.png', imgdir: Math.PI, speed: 60 },
+    { name: "Starwing", img: '/img/starwing.png', imgdir: Math.PI, speed: 90 },
 ];
 
 const weaponTypes = [
-    { name: "Red Laser", img: 'img/red laser.png', imgdir: 0, speed: 100, sfx: new Audio('sfx/green laser.mp3') },
-    { name: "Green Laser", img: 'img/red laser.png', imgdir: 0, speed: 100 },
-    { name: "Missile", img: 'img/red laser.png', imgdir: 0, speed: 100 },
-    { name: "Torpedo", img: 'img/red laser.png', imgdir: 0, speed: 100 },
+    { name: "Red Laser", img: '/img/red laser.png', imgdir: 0, speed: 100, sfx: new Audio('/sfx/green laser.mp3') },
+    { name: "Green Laser", img: '/img/red laser.png', imgdir: 0, speed: 100 },
+    { name: "Missile", img: '/img/red laser.png', imgdir: 0, speed: 100 },
+    { name: "Torpedo", img: '/img/red laser.png', imgdir: 0, speed: 100 },
 ];
 
 /**
